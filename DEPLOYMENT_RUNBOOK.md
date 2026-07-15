@@ -76,10 +76,15 @@ Required result: every command exits successfully and `.logs/hackathon_eval.log`
 - Devpost draft: complete
 - TypeScript check: passing
 - Production build: passing
-- Latest production-subreddit playtest upload: `v0.0.1.25`
-- Public subreddit/logged-out verification: pending
+- Devvit storage tests: passing (`2/2`)
+- Playwright multiplayer release suite: passing (`3/3`, including a complete four-client six-round match)
+- Hackathon evaluation: `10/10`
+- Latest uploaded release candidate: `v0.0.4`
+- Public Devvit publish/review request: submitted (`v0.0.4`)
+- Public subreddit/logged-out verification: complete
 - Mobile and role-based manual tests: pending
-- Devvit publish/review submission: pending
 - GitHub repository and `main` release branch: complete
-- Final public demo-post URL: pending
+- Final public demo-post URL: https://www.reddit.com/r/CannonsAndCastles/comments/1ux0u12/
+- Demo post community highlight: complete
+- GameVox tester room: configured (`CQDY-4227`)
 - Devpost submission confirmation: pending
