@@ -35,6 +35,7 @@ export type PhaseResolution = {
 };
 
 export type FinalResult = {
+  id: string;
   username: string;
   rawDamage: number;
   winner: boolean;

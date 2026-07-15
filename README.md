@@ -18,7 +18,18 @@ npm run dev
 
 The development target is [`r/CannonsAndCastles`](https://www.reddit.com/r/CannonsAndCastles). `npm run dev` watches the source, uploads development versions, and streams Devvit server logs.
 
-Production multiplayer uses Reddit identity, post-scoped matchmaking, Redis locking for the simultaneous-turn barrier and persistent state, and Devvit Realtime for client updates. The lifetime leaderboard is shared by all game posts in the app's subreddit installation.
+Production multiplayer uses Reddit identity, post-scoped matchmaking, Redis locking for the simultaneous-turn barrier and persistent state, and Devvit Realtime for client notifications. Redis remains authoritative: reconnecting clients resync state, interrupted resolutions are finalized idempotently, and completed results remain recoverable after a missed Realtime event. The lifetime leaderboard is shared by all game posts in the app's subreddit installation.
+
+## Stored data and deletion
+
+- Battle sessions expire after 30 days and are deleted immediately when their Reddit battle post is deleted.
+- Leaderboard aggregates use the verified Reddit user ID as their canonical key while displaying the latest verified username.
+- The leaderboard is capped at 500 commanders. Per-match idempotency receipts expire after 35 days, preventing unbounded match-history growth.
+- A signed-in player can use **Remove my leaderboard data** in the war room; the underlying endpoint derives identity from Reddit context and accepts no user-supplied identity.
+
+## Support and privacy requests
+
+For gameplay support, bug reports, or privacy help, contact the moderators through [r/CannonsAndCastles Modmail](https://www.reddit.com/message/compose?to=r/CannonsAndCastles). Include the battle-post link, device/browser, match size, and round where the problem occurred, but do not include passwords, access tokens, or other sensitive information.
 
 ## Start locally
 
@@ -72,13 +83,13 @@ npm test
 npm run evaluate
 ```
 
-The suite validates concurrent Redis joins and leaderboard idempotence, checks the damage model directly, renders a real two-player side-by-side match, and plays a full four-client game through all six rounds. The scored run writes `.logs/hackathon_eval.log`.
+The suite validates concurrent Redis joins, canonical leaderboard identity, receipt idempotence, recoverable phase settlement, post-deletion cleanup, the damage model, a real two-player side-by-side match, and a full four-client game through all six rounds. The scored run writes `.logs/hackathon_eval.log`.
 
 ## Project map
 
 - `devvit.json` — Reddit post entrypoints, server bundle, permissions, menu action, and install trigger.
 - `src/server/routes/game-api.ts` — Devvit matchmaking, Redis turn barrier, Realtime resolution, and leaderboard endpoints.
-- `tests/devvit-store.test.ts` — in-memory Devvit Redis concurrency and leaderboard coverage.
+- `tests/devvit-store.test.ts` — in-memory Devvit Redis concurrency, recovery, retention, and leaderboard coverage.
 - `src/client/transport/devvit-socket.ts` — Socket-compatible Reddit REST/Realtime adapter for the Phaser controller.
 - `server.js` — local Express/Socket.io matchmaking and phase barrier used by automated multi-client QA.
 - `server/game-engine.js` — territory generation, raycasting, penetration, damage, and scoring.

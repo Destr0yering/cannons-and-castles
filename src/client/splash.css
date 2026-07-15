@@ -6,11 +6,14 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: #171622; }
+html,
+body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #171622; }
 .splash-card {
   position: relative;
   display: grid;
-  min-height: 100vh;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
   place-items: center;
   align-content: center;
   gap: 12px;
@@ -36,3 +39,53 @@ button { z-index:1; padding:15px 22px; color:#171622; background:#ffd35a; border
 button:hover { transform:translate(2px,2px); box-shadow:3px 3px 0 #e64f5f; }
 button span { font-size:24px; vertical-align:-2px; }
 footer { z-index:1; margin-top:10px; color:#aca6bd; font-size:11px; letter-spacing:1px; }
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .splash-card {
+    gap: 5px;
+    padding: 8px 18px;
+    border-width: 4px;
+    box-shadow: inset 0 0 0 2px #c7a86b;
+  }
+
+  .kicker {
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+
+  h1 {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 12px;
+    font-size: clamp(38px, 8vw, 54px);
+    line-height: 0.9;
+    letter-spacing: -3px;
+    text-shadow: 3px 3px 0 #8d2944, 6px 6px 0 #100f19;
+  }
+
+  h1 small {
+    margin: 0;
+    font-size: 0.28em;
+  }
+
+  .fortress,
+  footer {
+    display: none;
+  }
+
+  #welcome {
+    max-width: 720px;
+    margin: 2px 0;
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  button {
+    min-height: 48px;
+    padding: 7px 18px;
+    border-width: 3px;
+    font-size: 13px;
+    box-shadow: 3px 3px 0 #e64f5f;
+  }
+}

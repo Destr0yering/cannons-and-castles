@@ -44,11 +44,13 @@
       'connection-status', 'scanline-toggle', 'lobby-screen', 'matchmaking-form', 'username',
       'queue-state', 'queue-count', 'leave-queue', 'lobby-error', 'lobby-leaderboard', 'game-shell',
       'match-code', 'round-heading', 'ready-counter', 'round-timeline', 'resolution-banner',
-      'battle-callout', 'grid-overlay', 'commander-card', 'commander-name', 'commander-score',
+      'battle-callout', 'territory-labels', 'grid-overlay', 'commander-card', 'commander-name', 'commander-score',
       'orders-kicker', 'orders-title', 'order-count', 'resource-rack', 'resource-wood',
       'resource-brick', 'resource-steel', 'attack-orders', 'aim-controls', 'order-summary',
       'clear-orders', 'lock-turn', 'lock-feedback', 'player-scores', 'end-screen', 'winner-copy',
-      'final-results', 'end-leaderboard', 'play-again', 'animation-events',
+      'final-results', 'end-leaderboard', 'play-again', 'animation-events', 'open-mobile-build',
+      'mobile-build-editor', 'mobile-build-grid', 'mobile-build-title', 'close-mobile-build',
+      'privacy-controls', 'delete-leaderboard-entry', 'privacy-feedback',
     ];
     for (const id of ids) dom[id] = document.getElementById(id);
   }
@@ -77,8 +79,19 @@
       if (local.state?.phase === 'attack') initializeAims(true);
       renderState();
     });
+    dom['open-mobile-build'].addEventListener('click', openMobileBuildEditor);
+    dom['close-mobile-build'].addEventListener('click', closeMobileBuildEditor);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !dom['mobile-build-editor'].classList.contains('hidden')) {
+        closeMobileBuildEditor();
+      }
+    });
     dom['lock-turn'].addEventListener('click', lockTurn);
     dom['play-again'].addEventListener('click', () => window.location.reload());
+    if (socket.transport === 'reddit-realtime') {
+      dom['privacy-controls'].classList.remove('hidden');
+      dom['delete-leaderboard-entry'].addEventListener('click', deleteLeaderboardEntry);
+    }
 
     socket.on('connect', () => {
       dom['connection-status'].dataset.connected = 'true';
@@ -118,7 +131,24 @@
     });
   }
 
+  function deleteLeaderboardEntry() {
+    if (!window.confirm('Remove your lifetime leaderboard score and battle totals? This cannot be undone.')) return;
+    const button = dom['delete-leaderboard-entry'];
+    button.disabled = true;
+    dom['privacy-feedback'].textContent = 'REMOVING LEADERBOARD DATA…';
+    socket.emit('deleteLeaderboardEntry', undefined, (result) => {
+      button.disabled = false;
+      if (!result?.ok) {
+        dom['privacy-feedback'].textContent = result?.error || 'LEADERBOARD DATA COULD NOT BE REMOVED.';
+        return;
+      }
+      renderLeaderboard(dom['lobby-leaderboard'], result.leaderboard || []);
+      dom['privacy-feedback'].textContent = 'YOUR LEADERBOARD DATA HAS BEEN REMOVED.';
+    });
+  }
+
   function receiveMatchState(state) {
+    const enteringMatch = dom['game-shell'].classList.contains('hidden');
     const roundChanged = state.round !== local.currentRound;
     local.state = state;
     local.currentRound = state.round;
@@ -133,8 +163,13 @@
     dom['lobby-screen'].classList.add('hidden');
     dom['end-screen'].classList.add('hidden');
     dom['game-shell'].classList.remove('hidden');
+    document.body.classList.add('battle-active');
     dom['resolution-banner'].classList.toggle('hidden', !state.resolving);
     renderState();
+    if (enteringMatch) {
+      window.scrollTo(0, 0);
+      requestAnimationFrame(() => window.scrollTo(0, 0));
+    }
   }
 
   function renderState() {
@@ -158,6 +193,7 @@
     renderTimeline();
     renderPhaseControls(self);
     renderBuildOverlay(self);
+    renderTerritoryLabels();
     renderScores();
     renderToolSelection();
     if (local.scene) local.scene.renderMatch(state, local.placements, local.aims);
@@ -166,7 +202,8 @@
   function renderTimeline() {
     dom['round-timeline'].innerHTML = local.state.timeline.map((item) => {
       const className = item.round < local.state.round ? 'done' : item.round === local.state.round ? 'active' : '';
-      return `<li class="${className}" data-round="${item.round}" data-phase="${item.phase}"><span>R${item.round}</span>${escapeHtml(item.name)}</li>`;
+      const shortName = item.round === 6 ? 'FINAL' : item.phase === 'attack' ? 'FIRE' : item.phase === 'rebuild' ? 'REBUILD' : 'BUILD';
+      return `<li class="${className}" data-round="${item.round}" data-phase="${item.phase}"><span class="round-number">R${item.round}</span><span class="round-name">${escapeHtml(item.name)}</span><span class="round-short">${shortName}</span></li>`;
     }).join('');
   }
 
@@ -175,6 +212,8 @@
     const isRebuild = local.state.phase === 'rebuild';
     dom['resource-rack'].classList.toggle('hidden', isAttack);
     dom['attack-orders'].classList.toggle('hidden', !isAttack);
+    dom['open-mobile-build'].classList.toggle('hidden', isAttack);
+    if (isAttack) closeMobileBuildEditor(false);
     dom['orders-kicker'].textContent = isAttack ? 'GUN CREW ORDER' : isRebuild ? 'REBUILD ORDER' : 'FORTIFY ORDER';
     dom['orders-title'].textContent = isAttack ? 'PIVOT EVERY CANNON' : isRebuild ? 'REPLACE OR EXTEND WALLS' : 'PLACE YOUR WALLS';
     dom['order-count'].textContent = isAttack ? `${local.aims.size} SHOTS` : `${local.placements.size} / 25`;
@@ -211,7 +250,7 @@
         : 'NO ENEMY ON LINE';
       return `
         <div class="cannon-aim-row" data-cannon="${key}" data-hit="${trace.first ? trace.first.cell.type : 'miss'}">
-          <strong>CANNON ${index + 1}<small class="${trace.first ? '' : 'miss'}">${escapeHtml(target)}</small></strong>
+          <strong>CANNON ${index + 1}<small class="${trace.first ? '' : 'miss'}" title="${escapeHtml(target)}">${escapeHtml(target)}</small></strong>
           <button type="button" class="aim-button" data-turn="-10" aria-label="Rotate cannon ${index + 1} left">‹</button>
           <span class="aim-angle">${String(angle).padStart(3, '0')}°</span>
           <button type="button" class="aim-button" data-turn="10" aria-label="Rotate cannon ${index + 1} right">›</button>
@@ -252,12 +291,17 @@
   }
 
   function createBuildOverlay() {
+    createBuildGrid(dom['grid-overlay'], 'board-cell');
+    createBuildGrid(dom['mobile-build-grid'], 'mobile-build-cell');
+  }
+
+  function createBuildGrid(container, className) {
     const fragment = document.createDocumentFragment();
     for (let y = 0; y < SIZE; y += 1) {
       for (let x = 0; x < SIZE; x += 1) {
         const button = document.createElement('button');
         button.type = 'button';
-        button.className = 'board-cell';
+        button.className = className;
         button.dataset.x = String(x);
         button.dataset.y = String(y);
         button.setAttribute('role', 'gridcell');
@@ -265,7 +309,7 @@
         fragment.appendChild(button);
       }
     }
-    dom['grid-overlay'].appendChild(fragment);
+    container.appendChild(fragment);
   }
 
   function renderBuildOverlay(self) {
@@ -280,16 +324,46 @@
     });
     dom['grid-overlay'].classList.toggle('hidden', local.state.phase === 'attack');
 
-    for (const button of dom['grid-overlay'].querySelectorAll('.board-cell')) {
+    for (const button of document.querySelectorAll('.board-cell, .mobile-build-cell')) {
       const x = Number(button.dataset.x);
       const y = Number(button.dataset.y);
       const cell = self.grid[y][x];
       const pending = local.placements.get(`${x}:${y}`);
       button.dataset.structure = cell?.type || 'ground';
+      button.dataset.pendingMaterial = pending?.type || '';
       button.classList.toggle('pending', Boolean(pending));
       button.disabled = local.locked || Boolean(cell);
       button.setAttribute('aria-label', `${cell?.type || 'open ground'} at column ${x + 1}, row ${y + 1}${pending ? `; pending ${pending.type}` : ''}`);
     }
+  }
+
+  function renderTerritoryLabels() {
+    const view = boardView(local.state.layout);
+    const territoryWidth = SIZE * view.tile;
+    dom['territory-labels'].innerHTML = local.state.players.map((player, index) => {
+      const left = (view.x + player.territory.col * territoryWidth + 6) / CANVAS_WIDTH * 100;
+      const top = (view.y + player.territory.row * territoryWidth + 6) / CANVAS_HEIGHT * 100;
+      const width = (territoryWidth - 12) / CANVAS_WIDTH * 100;
+      const self = player.id === local.state.viewerId;
+      const label = `${self ? 'YOU' : `P${index + 1}`} · ${player.housesSurviving} CASTLES`;
+      return `<span class="${self ? 'self' : ''}" data-player-id="${player.id}" title="${escapeHtml(player.username)} · ${player.housesSurviving} castles" style="left:${left}%;top:${top}%;width:${width}%;--player-color:${player.color}">${label}</span>`;
+    }).join('');
+  }
+
+  function openMobileBuildEditor() {
+    if (local.state?.phase === 'attack') return;
+    dom['mobile-build-editor'].classList.remove('hidden');
+    dom['open-mobile-build'].setAttribute('aria-expanded', 'true');
+    document.body.classList.add('mobile-editor-open');
+    dom['close-mobile-build'].focus();
+  }
+
+  function closeMobileBuildEditor(restoreFocus = true) {
+    if (dom['mobile-build-editor'].classList.contains('hidden')) return;
+    dom['mobile-build-editor'].classList.add('hidden');
+    dom['open-mobile-build'].setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('mobile-editor-open');
+    if (restoreFocus && !dom['open-mobile-build'].classList.contains('hidden')) dom['open-mobile-build'].focus();
   }
 
   function queuePlacement(x, y) {
@@ -364,6 +438,8 @@
 
   function showGameOver(payload) {
     local.state = payload.state;
+    closeMobileBuildEditor(false);
+    document.body.classList.remove('battle-active');
     dom['game-shell'].classList.add('hidden');
     dom['end-screen'].classList.remove('hidden');
     dom['end-screen'].dataset.gameOver = 'true';
@@ -378,6 +454,7 @@
         <b>${result.finalScore} PTS</b>
       </div>`).join('');
     renderLeaderboard(dom['end-leaderboard'], payload.leaderboard);
+    window.scrollTo(0, 0);
   }
 
   function renderLeaderboard(container, entries = []) {

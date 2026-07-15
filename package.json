@@ -7,14 +7,14 @@
   "scripts": {
     "start": "node server.js",
     "dev:local": "node server.js",
-    "dev": "devvit playtest",
+    "dev": "devvit playtest r/CannonsAndCastles",
     "build": "vite build",
     "deploy": "npm run type-check && devvit upload",
-    "launch": "npm run deploy && devvit publish",
+    "launch": "npm run type-check && devvit publish",
     "login": "devvit login",
     "type-check": "tsc --build",
     "test": "node scripts/run-playwright.js",
-    "test:devvit": "vitest run --config vitest.config.ts tests/devvit-store.test.ts",
+    "test:devvit": "vitest run --config vitest.config.ts tests/devvit-store.test.ts tests/devvit-route.test.ts tests/game-engine.test.js",
     "test:evaluation": "node scripts/run-playwright.js evaluation.spec.js",
     "evaluate": "node scripts/evaluate.js"
   },

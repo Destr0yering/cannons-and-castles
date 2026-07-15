@@ -1,6 +1,11 @@
-import type { OnAppInstallRequest, TriggerResponse } from '@devvit/web/shared';
+import type {
+  OnAppInstallRequest,
+  OnPostDeleteRequest,
+  TriggerResponse,
+} from '@devvit/web/shared';
 import { Hono } from 'hono';
 import { createBattlePost } from '../core/post';
+import { deleteSession } from '../store';
 
 export const triggers = new Hono();
 
@@ -18,5 +23,16 @@ triggers.post('/on-app-install', async (c) => {
       { status: 'error', message: 'Failed to create the first battle post.' },
       400
     );
+  }
+});
+
+triggers.post('/on-post-delete', async (c) => {
+  try {
+    const input = await c.req.json<OnPostDeleteRequest>();
+    await deleteSession(input.postId);
+    return c.json<TriggerResponse>({});
+  } catch (error) {
+    console.error('Failed to remove deleted battle state:', error);
+    return c.json<TriggerResponse>({}, 500);
   }
 });

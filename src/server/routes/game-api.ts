@@ -4,23 +4,28 @@ import { Hono } from 'hono';
 import type {
   ActionResponse,
   InitResponse,
+  LeaderboardEntry,
   RealtimeMessage,
   StateResponse,
 } from '../../shared/api';
+import { battleChannel } from '../../shared/realtime';
 import {
   createMatch,
-  finalResults,
   normalizeAction,
   publicMatch,
   resolveRound,
   type PhaseResolution,
 } from '../game-engine';
 import {
+  deleteLeaderboardUser,
+  markLeaderboardRecorded,
   readLeaderboard,
   readSession,
   recordLeaderboard,
   RequestError,
+  settleDueResolution,
   updateSession,
+  type BattleSession,
   type RequestStatus,
 } from '../store';
 
@@ -54,6 +59,11 @@ type LockResult = {
   resolution: PhaseResolution | null;
 };
 
+type ReconciledSession = {
+  session: BattleSession;
+  leaderboard: LeaderboardEntry[];
+};
+
 export const gameApi = new Hono();
 
 async function getIdentity(): Promise<Identity> {
@@ -66,11 +76,16 @@ async function getIdentity(): Promise<Identity> {
 }
 
 function channel(postId: string): string {
-  return `cannons-castles:${postId}`;
+  return battleChannel(postId);
 }
 
-async function publish(postId: string, message: RealtimeMessage): Promise<void> {
-  await realtime.send(channel(postId), message);
+async function safePublish(postId: string, message: RealtimeMessage): Promise<void> {
+  try {
+    await realtime.send(channel(postId), message);
+  } catch (error) {
+    // Redis is authoritative. A later state refresh recovers a missed notification.
+    console.error(`Realtime ${message.type} notification failed:`, error);
+  }
 }
 
 function errorResponse(error: unknown): { status: RequestStatus; message: string } {
@@ -79,16 +94,64 @@ function errorResponse(error: unknown): { status: RequestStatus; message: string
   return { status: 500, message: 'The war room lost that order. Please try again.' };
 }
 
+async function reconcileAndNotify(postId: string): Promise<ReconciledSession> {
+  const settlement = await settleDueResolution(postId);
+  let session = await readSession(postId);
+  let leaderboard: LeaderboardEntry[];
+
+  if (session.completedBattle && !session.completedBattle.leaderboardRecorded) {
+    try {
+      leaderboard = await recordLeaderboard(
+        session.completedBattle.matchId,
+        session.completedBattle.results
+      );
+      await markLeaderboardRecorded(postId, session.completedBattle.matchId);
+      session = await readSession(postId);
+    } catch (error) {
+      // The completed battle remains durable and the next request retries idempotently.
+      console.error('Deferred leaderboard recording failed:', error);
+      leaderboard = await readLeaderboard();
+    }
+  } else {
+    leaderboard = await readLeaderboard();
+  }
+
+  if (settlement.finalized) {
+    if (
+      session.completedBattle &&
+      session.match?.id === session.completedBattle.matchId
+    ) {
+      await safePublish(postId, {
+        type: 'gameOver',
+        results: session.completedBattle.results,
+        leaderboard,
+      });
+    } else {
+      await safePublish(postId, { type: 'stateChanged' });
+    }
+  }
+  return { session, leaderboard };
+}
+
+function recoveryFields(session: BattleSession, isPlayer: boolean) {
+  const completed = session.completedBattle;
+  const completedResults =
+    completed && completed.matchId === session.match?.id
+      ? completed.results
+      : null;
+  return {
+    lastResolution: isPlayer ? session.lastResolution?.resolution ?? null : null,
+    finalResults: isPlayer ? completedResults : null,
+  };
+}
+
 gameApi.get('/init', async (c) => {
   try {
     const identity = await getIdentity();
-    const [session, leaderboard] = await Promise.all([
-      readSession(identity.postId),
-      readLeaderboard(),
-    ]);
-    const activeMatch = session.match?.status !== 'ended' ? session.match : null;
+    const { session, leaderboard } = await reconcileAndNotify(identity.postId);
+    const match = session.match;
     const isPlayer = Boolean(
-      activeMatch?.players.some((player) => player.id === identity.userId)
+      match?.players.some((player) => player.id === identity.userId)
     );
     const queuedFor = session.entrants.some((entrant) => entrant.id === identity.userId)
       ? session.desiredPlayers
@@ -100,8 +163,9 @@ gameApi.get('/init', async (c) => {
       desiredPlayers: session.desiredPlayers,
       queued: session.entrants.length,
       queuedFor,
-      matchId: isPlayer && activeMatch ? activeMatch.id : undefined,
-      state: isPlayer && activeMatch ? publicMatch(activeMatch, identity.userId) : null,
+      matchId: isPlayer && match ? match.id : undefined,
+      state: isPlayer && match ? publicMatch(match, identity.userId) : null,
+      ...recoveryFields(session, isPlayer),
       leaderboard,
     });
   } catch (error) {
@@ -113,13 +177,15 @@ gameApi.get('/init', async (c) => {
 gameApi.get('/state', async (c) => {
   try {
     const identity = await getIdentity();
-    const session = await readSession(identity.postId);
+    const { session, leaderboard } = await reconcileAndNotify(identity.postId);
     if (!session.match || !session.match.players.some((player) => player.id === identity.userId)) {
       throw new RequestError('You are not assigned to the active battle.', 404);
     }
     return c.json<StateResponse>({
       ok: true,
       state: publicMatch(session.match, identity.userId),
+      ...recoveryFields(session, true),
+      leaderboard,
     });
   } catch (error) {
     const failure = errorResponse(error);
@@ -134,6 +200,7 @@ gameApi.get('/leaderboard', async (c) => {
 gameApi.post('/join', async (c) => {
   try {
     const identity = await getIdentity();
+    await reconcileAndNotify(identity.postId);
     const body = await c.req.json<JoinBody>();
     const desiredPlayers = Number(body.desiredPlayers);
     if (desiredPlayers !== 2 && desiredPlayers !== 4) {
@@ -145,6 +212,9 @@ gameApi.post('/join', async (c) => {
         session.match = null;
         session.desiredPlayers = null;
         session.entrants = [];
+        session.pendingResolution = null;
+        session.lastResolution = null;
+        session.completedBattle = null;
       }
       if (session.match) {
         const currentPlayer = session.match.players.find(
@@ -184,14 +254,14 @@ gameApi.post('/join', async (c) => {
     });
 
     if (result.matchId && result.players) {
-      await publish(identity.postId, {
+      await safePublish(identity.postId, {
         type: 'matchFound',
         matchId: result.matchId,
         players: result.players,
       });
-      await publish(identity.postId, { type: 'stateChanged' });
+      await safePublish(identity.postId, { type: 'stateChanged' });
     } else {
-      await publish(identity.postId, {
+      await safePublish(identity.postId, {
         type: 'queueStatus',
         desiredPlayers: result.desiredPlayers,
         queued: result.queued,
@@ -207,6 +277,7 @@ gameApi.post('/join', async (c) => {
 gameApi.post('/leave', async (c) => {
   try {
     const identity = await getIdentity();
+    await reconcileAndNotify(identity.postId);
     const result = await updateSession(identity.postId, (session) => {
       if (session.match) throw new RequestError('The battle has already begun.', 409);
       session.entrants = session.entrants.filter(
@@ -218,7 +289,7 @@ gameApi.post('/leave', async (c) => {
         queued: session.entrants.length,
       };
     });
-    await publish(identity.postId, { type: 'queueStatus', ...result });
+    await safePublish(identity.postId, { type: 'queueStatus', ...result });
     return c.json<ActionResponse>({ ok: true, ...result });
   } catch (error) {
     const failure = errorResponse(error);
@@ -229,6 +300,7 @@ gameApi.post('/leave', async (c) => {
 gameApi.post('/lock', async (c) => {
   try {
     const identity = await getIdentity();
+    await reconcileAndNotify(identity.postId);
     const body = await c.req.json<LockBody>();
     const turn = await updateSession<LockResult>(identity.postId, (session) => {
       const match = session.match;
@@ -248,6 +320,15 @@ gameApi.post('/lock', async (c) => {
       const readyCount = match.ready.size;
       const totalPlayers = match.players.length;
       const resolution = readyCount === totalPlayers ? resolveRound(match) : null;
+      if (resolution) {
+        const storedResolution = {
+          matchId: match.id,
+          resolution,
+          resolveAt: Date.now() + RESOLUTION_MS,
+        };
+        session.pendingResolution = storedResolution;
+        session.lastResolution = storedResolution;
+      }
       return {
         matchId: match.id,
         readyCount,
@@ -257,7 +338,7 @@ gameApi.post('/lock', async (c) => {
     });
 
     if (!turn.resolution) {
-      await publish(identity.postId, { type: 'stateChanged' });
+      await safePublish(identity.postId, { type: 'stateChanged' });
       return c.json<ActionResponse>({
         ok: true,
         readyCount: turn.readyCount,
@@ -265,40 +346,29 @@ gameApi.post('/lock', async (c) => {
       });
     }
 
-    await publish(identity.postId, {
+    await safePublish(identity.postId, {
       type: 'phaseResolution',
       resolution: turn.resolution,
     });
     await new Promise((resolve) => setTimeout(resolve, RESOLUTION_MS));
-
-    if (turn.resolution.gameOver) {
-      const results = await updateSession(identity.postId, (session) => {
-        const match = session.match;
-        if (!match || match.id !== turn.matchId) {
-          throw new RequestError('The completed battle could not be found.', 404);
-        }
-        match.status = 'ended';
-        match.resolving = false;
-        return finalResults(match);
-      });
-      const leaderboard = await recordLeaderboard(turn.matchId, results);
-      await publish(identity.postId, { type: 'gameOver', results, leaderboard });
-    } else {
-      await updateSession(identity.postId, (session) => {
-        const match = session.match;
-        if (!match || match.id !== turn.matchId) {
-          throw new RequestError('The active battle could not be found.', 404);
-        }
-        match.resolving = false;
-      });
-      await publish(identity.postId, { type: 'stateChanged' });
-    }
+    await reconcileAndNotify(identity.postId);
 
     return c.json<ActionResponse>({
       ok: true,
       readyCount: turn.readyCount,
       totalPlayers: turn.totalPlayers,
     });
+  } catch (error) {
+    const failure = errorResponse(error);
+    return c.json<ActionResponse>({ ok: false, error: failure.message }, failure.status);
+  }
+});
+
+gameApi.post('/privacy/delete-leaderboard-entry', async (c) => {
+  try {
+    const identity = await getIdentity();
+    await deleteLeaderboardUser(identity.userId, identity.username);
+    return c.json<ActionResponse>({ ok: true, leaderboard: await readLeaderboard() });
   } catch (error) {
     const failure = errorResponse(error);
     return c.json<ActionResponse>({ ok: false, error: failure.message }, failure.status);

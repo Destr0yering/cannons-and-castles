@@ -18,6 +18,8 @@ export type InitResponse = {
   queuedFor?: number | null;
   matchId?: string;
   state?: JsonValue | null;
+  lastResolution?: JsonValue | null;
+  finalResults?: JsonValue | null;
   leaderboard?: LeaderboardEntry[];
 };
 
@@ -29,12 +31,16 @@ export type ActionResponse = {
   readyCount?: number;
   totalPlayers?: number;
   matchId?: string;
+  leaderboard?: LeaderboardEntry[];
 };
 
 export type StateResponse = {
   ok: boolean;
   error?: string;
   state?: JsonValue;
+  lastResolution?: JsonValue | null;
+  finalResults?: JsonValue | null;
+  leaderboard?: LeaderboardEntry[];
 };
 
 export type RealtimeMessage =

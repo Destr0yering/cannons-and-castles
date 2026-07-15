@@ -124,6 +124,10 @@
               <ol id="lobby-leaderboard" class="leaderboard-list">
                 <li class="empty-row">NO BATTLES RECORDED — YET.</li>
               </ol>
+              <div id="privacy-controls" class="privacy-controls hidden">
+                <button id="delete-leaderboard-entry" type="button">REMOVE MY LEADERBOARD DATA</button>
+                <p id="privacy-feedback" role="status" aria-live="polite"></p>
+              </div>
             </section>
           </div>
         </section>
@@ -154,6 +158,7 @@
               </div>
               <div id="phaser-wrap" class="phaser-wrap">
                 <div id="phaser-game" aria-label="Pixel art castle battlefield"></div>
+                <div id="territory-labels" class="territory-labels" aria-hidden="true"></div>
                 <div id="grid-overlay" class="grid-overlay" role="grid" aria-label="Your 5 by 5 territory build grid"></div>
               </div>
               <div class="battle-legend" aria-label="Battlefield legend">
@@ -213,6 +218,17 @@
                   <div id="aim-controls" class="aim-controls" aria-label="Cannon aiming controls"></div>
                 </div>
 
+                <button
+                  id="open-mobile-build"
+                  class="mobile-build-trigger hidden"
+                  type="button"
+                  aria-controls="mobile-build-editor"
+                  aria-expanded="false"
+                >
+                  <span>OPEN 5×5 BUILD MAP</span>
+                  <small>TOUCH-SIZED HOMELAND EDITOR</small>
+                </button>
+
                 <div id="order-summary" class="order-summary">
                   <span>ORDERS ARE PRIVATE UNTIL EVERY COMMANDER LOCKS IN.</span>
                   <button id="clear-orders" type="button">CLEAR</button>
@@ -248,6 +264,31 @@
           </div>
         </section>
       </main>
+
+      <section
+        id="mobile-build-editor"
+        class="mobile-build-editor hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mobile-build-title"
+      >
+        <div class="mobile-build-panel pixel-panel">
+          <header class="mobile-build-heading">
+            <div>
+              <span>HOMELAND DETAIL</span>
+              <h2 id="mobile-build-title">PLACE YOUR WALLS</h2>
+            </div>
+            <button id="close-mobile-build" type="button" aria-label="Close build map">×</button>
+          </header>
+          <div
+            id="mobile-build-grid"
+            class="mobile-build-grid"
+            role="grid"
+            aria-label="Touch-sized 5 by 5 territory build grid"
+          ></div>
+          <p>Tap open ground to place the selected material. Tap a pending order to remove it.</p>
+        </div>
+      </section>
 
       <footer>
         <span>REDDIT DEVVIT EDITION</span>
