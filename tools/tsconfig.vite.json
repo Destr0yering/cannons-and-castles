@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "outDir": "../dist/types/vite",
+    "rootDir": "..",
+    "tsBuildInfoFile": "../dist/types/vite/tsconfig.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["../vite.config.ts"]
+}

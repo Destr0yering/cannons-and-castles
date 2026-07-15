@@ -1,0 +1,15 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+.data/
+.logs/
+.codex/
+.devvit/
+work/
+debug.log
+.env
+.env.*
+!.env.example
+outputs/
+.DS_Store

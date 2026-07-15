@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Cannons and Castles — a six-round multiplayer castle battler with a 16-bit soul."
+    />
+    <title>Cannons and Castles</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="crt-shell">
+      <header class="site-header">
+        <a class="mini-brand" href="/" aria-label="Cannons and Castles home">
+          <span class="mini-cannon" aria-hidden="true">●</span>
+          <span>CANNONS <i>&amp;</i> CASTLES</span>
+        </a>
+        <div class="header-actions">
+          <span id="connection-status" class="connection-status" data-connected="false">CONNECTING…</span>
+          <button id="scanline-toggle" class="icon-button" type="button" aria-pressed="true">
+            CRT: ON
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section id="lobby-screen" class="lobby-screen" aria-labelledby="game-title">
+          <div class="hero-panel pixel-panel">
+            <div class="hero-copy">
+              <p class="eyebrow">A SIX-ROUND SIEGE FOR 2 OR 4 RIVALS</p>
+              <h1 id="game-title">
+                <span>CANNONS</span>
+                <small>AND</small>
+                <span>CASTLES</span>
+              </h1>
+              <p class="hero-lede">
+                Raise the walls. Read your rivals. Then turn their proudest towers into very expensive smoke.
+              </p>
+              <div class="phase-preview" aria-label="The six round battle sequence">
+                <span class="phase-build">BUILD</span>
+                <b>›</b>
+                <span class="phase-attack">FIRE</span>
+                <b>›</b>
+                <span class="phase-repair">REBUILD</span>
+                <b>›</b>
+                <span class="phase-attack">FIRE</span>
+                <b>›</b>
+                <span class="phase-repair">REBUILD</span>
+                <b>›</b>
+                <span class="phase-final">FINISH</span>
+              </div>
+            </div>
+
+            <div class="match-card bevel-panel">
+              <div class="match-card-heading">
+                <span class="crossed-cannons" aria-hidden="true">⚔</span>
+                <div>
+                  <p>WAR ROOM</p>
+                  <h2>Find a battle</h2>
+                </div>
+              </div>
+              <form id="matchmaking-form">
+                <label for="username">COMMANDER NAME</label>
+                <input id="username" name="username" maxlength="20" autocomplete="nickname" placeholder="u/Stonewall" required />
+
+                <fieldset>
+                  <legend>ARMY SIZE</legend>
+                  <div class="army-size-options">
+                    <label><input type="radio" name="desiredPlayers" value="2" /><span>2</span></label>
+                    <label><input type="radio" name="desiredPlayers" value="4" checked /><span>4</span></label>
+                  </div>
+                </fieldset>
+
+                <button id="join-queue" class="primary-button" type="submit">
+                  <span>ENTER MATCHMAKING</span>
+                  <small>ALL GLORY IS LOCAL</small>
+                </button>
+              </form>
+              <div id="queue-state" class="queue-state hidden" role="status" aria-live="polite">
+                <div class="loader-flags" aria-hidden="true"><i></i><i></i><i></i></div>
+                <strong>RALLYING COMMANDERS…</strong>
+                <span id="queue-count">1 / 4 ready</span>
+                <button id="leave-queue" type="button">RETREAT</button>
+              </div>
+              <p id="lobby-error" class="error-text" role="alert"></p>
+            </div>
+          </div>
+
+          <div class="lobby-lower">
+            <section class="how-to pixel-panel" aria-labelledby="how-title">
+              <div class="section-heading">
+                <span>FIELD MANUAL 01</span>
+                <h2 id="how-title">THREE ORDERS. ONE SURVIVOR.</h2>
+              </div>
+              <div class="manual-grid">
+                <article>
+                  <div class="manual-icon wall-icon" aria-hidden="true"></div>
+                  <span class="step-number">01</span>
+                  <h3>FORTIFY</h3>
+                  <p>Build inside your 5×5 homeland. Protect the two borders exposed to your neighbors.</p>
+                </article>
+                <article>
+                  <div class="manual-icon cannon-icon" aria-hidden="true"></div>
+                  <span class="step-number">02</span>
+                  <h3>TARGET</h3>
+                  <p>Pivot each cannon in 10° steps. Shots strike the first enemy object on the guide.</p>
+                </article>
+                <article>
+                  <div class="manual-icon repair-icon" aria-hidden="true">✦</div>
+                  <span class="step-number">03</span>
+                  <h3>ENDURE</h3>
+                  <p>Replace destroyed walls, then score 250 points for every castle still standing.</p>
+                </article>
+              </div>
+            </section>
+
+            <section class="leaderboard-panel pixel-panel" aria-labelledby="leaderboard-title">
+              <div class="section-heading compact">
+                <span>GLOBAL REDDIT STATE</span>
+                <h2 id="leaderboard-title">LIFETIME DAMAGE</h2>
+              </div>
+              <ol id="lobby-leaderboard" class="leaderboard-list">
+                <li class="empty-row">NO BATTLES RECORDED — YET.</li>
+              </ol>
+            </section>
+          </div>
+        </section>
+
+        <section id="game-shell" class="game-shell hidden" data-round="0" data-phase="lobby" aria-label="Active battle">
+          <div class="battle-header pixel-panel">
+            <div>
+              <p class="eyebrow">MATCH <span id="match-code">--------</span></p>
+              <h2 id="round-heading">ROUND 1 — INITIAL BUILD</h2>
+            </div>
+            <div id="ready-counter" class="ready-counter" aria-live="polite">
+              <span>ORDERS LOCKED</span>
+              <strong>0 / 4</strong>
+            </div>
+          </div>
+
+          <ol id="round-timeline" class="round-timeline" aria-label="Round progress"></ol>
+
+          <div id="resolution-banner" class="resolution-banner hidden" aria-live="assertive">
+            <span>⚑</span><strong>RESOLVING ORDERS</strong><span>⚑</span>
+          </div>
+
+          <div class="battle-layout">
+            <section class="battlefield-column" aria-label="Your castle grid">
+              <div id="battle-callout" class="battle-callout">
+                <span class="callout-kicker">THE QUARTERMASTER REPORTS</span>
+                <strong>Spend your opening cache wisely.</strong>
+              </div>
+              <div id="phaser-wrap" class="phaser-wrap">
+                <div id="phaser-game" aria-label="Pixel art castle battlefield"></div>
+                <div id="grid-overlay" class="grid-overlay" role="grid" aria-label="Your 5 by 5 territory build grid"></div>
+              </div>
+              <div class="battle-legend" aria-label="Battlefield legend">
+                <span><i class="legend-keep"></i> CASTLE</span>
+                <span><i class="legend-wood"></i> WOOD</span>
+                <span><i class="legend-brick"></i> BRICK</span>
+                <span><i class="legend-steel"></i> STEEL</span>
+                <span><i class="legend-cannon"></i> CANNON</span>
+                <span><i class="legend-fire"></i> FIRE</span>
+              </div>
+            </section>
+
+            <aside class="command-column">
+              <section id="commander-card" class="commander-card bevel-panel">
+                <div class="commander-avatar" aria-hidden="true">♜</div>
+                <div>
+                  <p>YOUR BANNER</p>
+                  <h3 id="commander-name">COMMANDER</h3>
+                  <span id="commander-score">0 DAMAGE</span>
+                </div>
+              </section>
+
+              <section class="orders-panel pixel-panel">
+                <div class="orders-heading">
+                  <div>
+                    <span id="orders-kicker">BUILD ORDER</span>
+                    <h3 id="orders-title">CHOOSE MATERIAL</h3>
+                  </div>
+                  <span id="order-count" class="order-count">0 / 24</span>
+                </div>
+
+                <div id="resource-rack" class="resource-rack">
+                  <button class="tool-button selected" type="button" data-tool="wood">
+                    <i class="resource-swatch wood"></i>
+                    <span>WOOD<small>BREAKS · 50% PASSES</small></span>
+                    <b id="resource-wood">0</b>
+                  </button>
+                  <button class="tool-button" type="button" data-tool="brick">
+                    <i class="resource-swatch brick"></i>
+                    <span>BRICK<small>90% HIT · BLOCKS</small></span>
+                    <b id="resource-brick">0</b>
+                  </button>
+                  <button class="tool-button" type="button" data-tool="steel">
+                    <i class="resource-swatch steel"></i>
+                    <span>STEEL<small>60% HIT · BLOCKS</small></span>
+                    <b id="resource-steel">0</b>
+                  </button>
+                  <button class="tool-button cannon-tool" type="button" data-tool="cannon">
+                    <i class="resource-swatch cannon"></i>
+                    <span>EXTRA CANNON<small>COST: 3 STEEL · MAX 1</small></span>
+                    <b>+</b>
+                  </button>
+                </div>
+
+                <div id="attack-orders" class="attack-orders hidden">
+                  <p>Every surviving cannon fires once. Rotate in 10° steps; friendly structures never block the shot.</p>
+                  <div id="aim-controls" class="aim-controls" aria-label="Cannon aiming controls"></div>
+                </div>
+
+                <div id="order-summary" class="order-summary">
+                  <span>ORDERS ARE PRIVATE UNTIL EVERY COMMANDER LOCKS IN.</span>
+                  <button id="clear-orders" type="button">CLEAR</button>
+                </div>
+
+                <button id="lock-turn" class="lock-button" type="button">
+                  <span>LOCK IN ORDERS</span>
+                  <small>READY WHEN YOU ARE</small>
+                </button>
+                <p id="lock-feedback" class="lock-feedback" role="status"></p>
+              </section>
+            </aside>
+          </div>
+
+          <section class="score-strip pixel-panel" aria-label="Current score">
+            <span class="score-strip-title">SIEGE POINTS</span>
+            <div id="player-scores" class="player-scores"></div>
+          </section>
+        </section>
+
+        <section id="end-screen" class="end-screen hidden" aria-labelledby="end-title">
+          <div class="end-card pixel-panel">
+            <p class="eyebrow">THE SIXTH BARRAGE HAS ENDED</p>
+            <div class="victory-crown" aria-hidden="true">♛</div>
+            <h1 id="end-title">BATTLE COMPLETE</h1>
+            <p id="winner-copy" class="winner-copy"></p>
+            <div id="final-results" class="final-results"></div>
+            <div class="end-leaderboard">
+              <h2>GLOBAL LIFETIME DAMAGE</h2>
+              <ol id="end-leaderboard" class="leaderboard-list"></ol>
+            </div>
+            <button id="play-again" class="primary-button" type="button">RETURN TO WAR ROOM</button>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <span>REDDIT DEVVIT EDITION</span>
+        <span>TURN-BASED · REDIS-AUTHORITATIVE · BUILT WITH PHASER</span>
+      </footer>
+    </div>
+
+    <div id="animation-events" class="sr-only" aria-hidden="true"></div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/vendor/phaser.min.js"></script>
+    <script src="/castle-controller.js"></script>
+  </body>
+</html>
