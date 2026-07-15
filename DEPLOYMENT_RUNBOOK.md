@@ -5,6 +5,7 @@
 - Devvit app: `cannons-and-castles`
 - Production subreddit: `r/CannonsAndCastles`
 - Production community URL: https://www.reddit.com/r/CannonsAndCastles
+- Public source repository: https://github.com/Destr0yering/cannons-and-castles
 - Match sizes: two or four players
 
 The former development subreddit is not part of this release. Do not use it in app metadata, documentation, judging instructions, screenshots, or submission fields.
@@ -79,6 +80,6 @@ Required result: every command exits successfully and `.logs/hackathon_eval.log`
 - Public subreddit/logged-out verification: pending
 - Mobile and role-based manual tests: pending
 - Devvit publish/review submission: pending
-- GitHub repository and remote: pending
+- GitHub repository and `main` release branch: complete
 - Final public demo-post URL: pending
 - Devpost submission confirmation: pending
